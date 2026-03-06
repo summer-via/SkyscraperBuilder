@@ -1,0 +1,76 @@
+# 这份 .gitignore 专为 Unity 项目设计
+# 它忽略所有由 Unity 编辑器和操作系统生成的临时文件、缓存和日志
+# 只保留核心的 Assets, ProjectSettings, Packages 文件夹
+
+# ==============
+#  Unity 生成的文件
+# ==============
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/UserSettings/
+
+# 内存分析器相关
+Assets/AssetStoreTools*
+Assets/AssetStoreTools.meta
+
+# ==============
+#  Visual Studio / MonoDevelop / JetBrains Rider 生成的文件
+# ==============
+# 用户特定的选项和配置文件
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.unityproj
+*.pidb
+*.booproj
+
+# Rider 相关
+/.idea/
+
+# Visual Studio Code 相关
+.vscode/
+
+# ==============
+#  Mac 系统文件
+# ==============
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon*
+._*
+
+# Thumbnails
+._*
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
+
+# ==============
+#  Windows 系统文件
+# ==============
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==============
+#  其他可能生成的文件
+# ==============
+*.orig
+export_presets.cfg
+
+# ==============
+#  Git LFS 相关 (如果你使用 LFS，取消下面的注释)
+#  通常配合 .gitattributes 使用，这里不需要额外配置
+# ==============
+# 保持注释状态，因为 LFS 是通过 .gitattributes 管理的，不是通过 ignore
+
+.vsconfig
+.vs
+*.slnx
