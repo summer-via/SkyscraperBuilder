@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using UnityEngine.InputSystem;
+using System;
 
 public class Game : MonoBehaviour
 {
@@ -15,13 +16,15 @@ public class Game : MonoBehaviour
     [SerializeField] private AudioSource placeSound;
     [SerializeField] private AudioSource perfectSound;
     [SerializeField] private AudioSource gameOverSound;
+    [SerializeField] private BackgroundManager backgroundManager;
 
     private GameObject currentBlock;
     private float blockSpeed = 2f;
     private bool isMovingRight = true;
     private int score = 0;
     private int perfectStreak = 0;
-    private float buildingHeight = 0f;
+    private float buildingHeight = 1f; // 初始值为底座的高度
+    private int floorCount = 1; // 楼层计数器，从1开始
     private float maxBuildingWidth = 1f;
     private bool isGameOver = false;
     private bool isGameStarted = false;
@@ -30,6 +33,8 @@ public class Game : MonoBehaviour
     private float maxShakeMagnitude = 0.2f;
     private Vector3 initialCameraPos;
     private Vector3 targetCameraPos; // 目标相机位置
+    private float blockHeight;
+
 
     void Start()
     {
@@ -49,11 +54,11 @@ public class Game : MonoBehaviour
         // 重置游戏状态
         score = 0;
         perfectStreak = 0;
-        buildingHeight = 0f;
         shakeMagnitude = 0f;
         isGameOver = false;
         isGameStarted = false;
         currentBlock = null;
+        floorCount = 1; // 重置楼层计数器
 
         Debug.Log("Initializing game...");
 
@@ -75,6 +80,16 @@ public class Game : MonoBehaviour
         // 重置相机位置
         Camera.main.transform.position = initialCameraPos;
         targetCameraPos = initialCameraPos;
+
+        // 重置背景管理器
+        if (backgroundManager != null)
+        {
+            // 清空现有背景
+            foreach (Transform child in backgroundManager.transform)
+            {
+                Destroy(child.gameObject);
+            }
+        }
 
         // 更新UI
         if (scoreText != null)
@@ -168,6 +183,9 @@ public class Game : MonoBehaviour
         }
 
         currentBlock = Instantiate(blockPrefab, buildingParent);
+        // 设置方块名称为FloorN格式
+        currentBlock.name = "Floor" + floorCount;
+        floorCount++;
         // 在屏幕顶部生成
         float top = getScreenTop();
         currentBlock.transform.position = new Vector3(0, top, 0);
@@ -210,7 +228,10 @@ public class Game : MonoBehaviour
         clickAction.performed += ctx => ReleaseBlock();
         initialCameraPos = Camera.main.transform.position;
         targetCameraPos = initialCameraPos;
+        blockHeight = blockPrefab.GetComponent<BoxCollider2D>().size.y * blockPrefab.transform.localScale.y;
 
+        Debug.Log("blockHeight: " + blockHeight);
+        buildingHeight = blockHeight/2;
     }
 
     void OnEnable()
@@ -254,10 +275,10 @@ public class Game : MonoBehaviour
                 // 检查是否掉出y=0之下
                 if (currentBlock.transform.position.y < 0 || hasCollided)
                 {
-                    // 方块放置完成，生成新方块
+                    // 方块放置完成，清理引用
                     currentBlock = null;
                     hasCollided = false;
-                    StartCoroutine(SpawnNextBlock());
+                    // 不再自动生成新方块，等待玩家下一次点击
                 }
             }
         }
@@ -266,20 +287,30 @@ public class Game : MonoBehaviour
     // 在Update中持续检查游戏结束条件
     void CheckGameOverInUpdate()
     {
+        if (isGameOver) return;
+        
         if (currentBlock != null)
         {
-            // 检查方块是否掉落
-            if (currentBlock.transform.position.y < -6)
+            Rigidbody2D rb = currentBlock.GetComponent<Rigidbody2D>();
+            // 只有当方块已经启用了物理（处于下落状态）时，才检查是否掉落
+            if (rb.bodyType == RigidbodyType2D.Dynamic)
             {
-                Debug.Log("Game Over: Block fell below threshold");
-                GameOver();
+                // 检查方块是否掉落
+                if (currentBlock.transform.position.y < -6)
+                {
+                    Debug.Log("Game Over: Block fell below threshold");
+                    GameOver();
+                }
             }
         }
 
-        // 检查建筑是否倾斜过度
-        foreach (Transform child in buildingParent)
+        // 检查建筑是否倾斜过度（跳过初始平台）
+        for (int i = 1; i < buildingParent.childCount; i++)
         {
-            if (Mathf.Abs(child.rotation.eulerAngles.z) > 45)
+            Transform child = buildingParent.GetChild(i);
+            // 检查建筑块的旋转角度，只有当旋转角度确实超过45度时才触发游戏结束
+            float zRotation = child.rotation.eulerAngles.z;
+            if (zRotation > 45 && zRotation < 315) // 处理0-360度的角度范围
             {
                 Debug.Log("Game Over: Building tilted too much");
                 GameOver();
@@ -310,26 +341,20 @@ public class Game : MonoBehaviour
     float getScreenTop()
     {
         Camera mainCamera = Camera.main;
-        Vector3 nowPos = mainCamera.transform.position;
         float cameraHeight = mainCamera.orthographicSize * 2;
-        float cameraWidth = cameraHeight * mainCamera.aspect;
-
         float top = mainCamera.transform.position.y + cameraHeight / 2;
         return top;
     }
 
     void ReleaseBlock()
     {
+        Debug.Log("building height: " + buildingHeight);
         if (!isGameStarted || isGameOver) return;
 
-        // 如果是第一次点击，生成第一个方块
-        if (currentBlock == null)
-        {
-            SpawnNewBlock();
-            return;
-        }
-
-        // 启用物理
+        // 生成新方块
+        SpawnNewBlock();
+        
+        // 立即启用物理，让方块下坠
         Rigidbody2D rb = currentBlock.GetComponent<Rigidbody2D>();
         rb.bodyType = RigidbodyType2D.Dynamic;
 
@@ -358,16 +383,20 @@ public class Game : MonoBehaviour
         UpdateScoreText();
 
         // 增加建筑高度
-        buildingHeight += 1f;
+        buildingHeight += blockHeight;
+
 
         // 相机跟随建筑高度
         Camera mainCamera = Camera.main;
+        Vector3 nowPos = mainCamera.transform.position;
+        float top = getScreenTop();
         
-        // 计算目标相机位置，确保建筑顶部与相机保持6f的间距
-        float targetY = buildingHeight - 4f; // 让建筑顶部位于相机下方6f处
-        
-        // 平滑设置目标位置
-        targetCameraPos = new Vector3(targetCameraPos.x, targetY, targetCameraPos.z);
+        // 当建筑高度接近屏幕顶部时，相机向上移动
+        if (top - buildingHeight < 5)
+        {
+            float delta = 5 - (top - buildingHeight);
+            targetCameraPos = new Vector3(targetCameraPos.x, nowPos.y + delta, targetCameraPos.z);
+        }
         // 增加摇晃幅度
         // shakeMagnitude = Mathf.Min(shakeMagnitude + shakeIncrement, maxShakeMagnitude);
 
