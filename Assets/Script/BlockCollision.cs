@@ -28,7 +28,7 @@ public class BlockCollision : MonoBehaviour
         Debug.Log("碰撞检测: 是否刚体相同: " + (targetRigidbody == selfRigidbody));
 
         // 确保碰撞到的物体有刚体，且不是自身，否则关节无法连接
-        if (targetRigidbody != null && gameObject != collidedObject)
+        if (targetRigidbody != null && gameObject != collidedObject && collidedObject.tag != "Respawn")
         {
             // 2. 动态添加一个固定关节
             FixedJoint2D joint = gameObject.AddComponent<FixedJoint2D>();

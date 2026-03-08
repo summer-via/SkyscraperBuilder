@@ -17,6 +17,7 @@ public class Game : MonoBehaviour
     [SerializeField] private AudioSource perfectSound;
     [SerializeField] private AudioSource gameOverSound;
     [SerializeField] private BackgroundManager backgroundManager;
+    [SerializeField] private GameObject blockRef; // 外部传入的方块引用
 
     private GameObject currentBlock;
     private float blockSpeed = 2f;
@@ -47,10 +48,12 @@ public class Game : MonoBehaviour
         startText.gameObject.SetActive(false);
         startButton.gameObject.SetActive(false);
         // 不立即生成新方块，等待玩家第一次点击
+        blockRef.GetComponent<Rigidbody2D>().linearVelocity = new Vector2(-3, 0);
     }
 
     void InitializeGame()
     {
+        blockRef.GetComponent<Rigidbody2D>().linearVelocity = Vector2.zero;
         // 重置游戏状态
         score = 0;
         perfectStreak = 0;
@@ -58,6 +61,7 @@ public class Game : MonoBehaviour
         isGameOver = false;
         isGameStarted = false;
         currentBlock = null;
+        buildingHeight = blockHeight / 2f;
         floorCount = 1; // 重置楼层计数器
 
         Debug.Log("Initializing game...");
@@ -80,16 +84,6 @@ public class Game : MonoBehaviour
         // 重置相机位置
         Camera.main.transform.position = initialCameraPos;
         targetCameraPos = initialCameraPos;
-
-        // 重置背景管理器
-        if (backgroundManager != null)
-        {
-            // 清空现有背景
-            foreach (Transform child in backgroundManager.transform)
-            {
-                Destroy(child.gameObject);
-            }
-        }
 
         // 更新UI
         if (scoreText != null)
@@ -164,7 +158,7 @@ public class Game : MonoBehaviour
             return;
         }
 
-        rb.bodyType = RigidbodyType2D.Kinematic;
+        // rb.bodyType = RigidbodyType2D.Kinematic;
         Debug.Log("Platform created at position: " + platform.transform.position);
     }
 
@@ -186,9 +180,20 @@ public class Game : MonoBehaviour
         // 设置方块名称为FloorN格式
         currentBlock.name = "Floor" + floorCount;
         floorCount++;
-        // 在屏幕顶部生成
-        float top = getScreenTop();
-        currentBlock.transform.position = new Vector3(0, top, 0);
+        // 检查blockRef是否赋值，如果有则在其位置生成，否则在屏幕顶部生成
+        Vector3 spawnPosition;
+        if (blockRef != null)
+        {
+            spawnPosition = blockRef.transform.position;
+        }
+        else
+        {
+            // 如果blockRef未赋值，在屏幕顶部生成
+            float top = getScreenTop();
+            spawnPosition = new Vector3(0, top, 0);
+            Debug.LogWarning("blockRef is not assigned, spawning block at screen top");
+        }
+        currentBlock.transform.position = spawnPosition;
 
         Rigidbody2D rb = currentBlock.GetComponent<Rigidbody2D>();
         if (rb == null)
@@ -197,7 +202,7 @@ public class Game : MonoBehaviour
             return;
         }
 
-        rb.bodyType = RigidbodyType2D.Kinematic;
+        // rb.bodyType = RigidbodyType2D.Kinematic;
         
         // 添加碰撞检测
         BoxCollider2D collider = currentBlock.GetComponent<BoxCollider2D>();
@@ -392,9 +397,9 @@ public class Game : MonoBehaviour
         float top = getScreenTop();
         
         // 当建筑高度接近屏幕顶部时，相机向上移动
-        if (top - buildingHeight < 5)
+        if (top - buildingHeight < 7)
         {
-            float delta = 5 - (top - buildingHeight);
+            float delta = 7 - (top - buildingHeight);
             targetCameraPos = new Vector3(targetCameraPos.x, nowPos.y + delta, targetCameraPos.z);
         }
         // 增加摇晃幅度
