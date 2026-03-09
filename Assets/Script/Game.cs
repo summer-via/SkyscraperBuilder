@@ -47,7 +47,6 @@ public class Game : MonoBehaviour
         isGameStarted = true;
         startText.gameObject.SetActive(false);
         startButton.gameObject.SetActive(false);
-        // 不立即生成新方块，等待玩家第一次点击
         blockRef.GetComponent<Rigidbody2D>().linearVelocity = new Vector2(-3, 0);
     }
 
@@ -150,7 +149,6 @@ public class Game : MonoBehaviour
 
         GameObject platform = Instantiate(blockPrefab, buildingParent);
         platform.transform.position = new Vector3(0, 1f, 0);
-
         Rigidbody2D rb = platform.GetComponent<Rigidbody2D>();
         if (rb == null)
         {
@@ -158,7 +156,8 @@ public class Game : MonoBehaviour
             return;
         }
 
-        // rb.bodyType = RigidbodyType2D.Kinematic;
+        // 设置为Kinematic类型，使平台固定不动，模拟地基
+        rb.bodyType = RigidbodyType2D.Kinematic;
         Debug.Log("Platform created at position: " + platform.transform.position);
     }
 
@@ -202,7 +201,7 @@ public class Game : MonoBehaviour
             return;
         }
 
-        // rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.bodyType = RigidbodyType2D.Dynamic;
         
         // 添加碰撞检测
         BoxCollider2D collider = currentBlock.GetComponent<BoxCollider2D>();
@@ -445,7 +444,11 @@ public class Game : MonoBehaviour
     {
         yield return new WaitForSeconds(1f);
 
-        CheckGameOverInUpdate();
+        // 只有当游戏未结束时才检查，避免重新开始时的误判
+        if (!isGameOver)
+        {
+            CheckGameOverInUpdate();
+        }
     }
 
     IEnumerator SpawnNextBlock()
@@ -474,6 +477,8 @@ public class Game : MonoBehaviour
 
     public void RestartGame()
     {
+        // 停止所有正在运行的协程，避免重新开始时的误判
+        StopAllCoroutines();
         InitializeGame();
         StartGame();
     }
