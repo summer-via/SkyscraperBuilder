@@ -2,7 +2,7 @@
 - Project name: SkyscraperBuilder
 - Unity version: Unity 6000.3.0f1
 - Active game object:
-  - Name: Floor2
+  - Name: Restart
   - Tag: Untagged
-  - Layer: Default
+  - Layer: UI
 <!-- UNITY CODE ASSIST INSTRUCTIONS END -->

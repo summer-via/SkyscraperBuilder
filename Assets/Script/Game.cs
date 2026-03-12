@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine.InputSystem;
 using System;
 
@@ -10,7 +11,7 @@ public class Game : MonoBehaviour
     [SerializeField] private Transform buildingParent;
     [SerializeField] private Text scoreText;
     [SerializeField] private Text gameOverText;
-    [SerializeField] private Text startText;
+    // [SerializeField] private Text startText;
     [SerializeField] private Button restartButton;
     [SerializeField] private Button startButton;
     [SerializeField] private AudioSource placeSound;
@@ -35,6 +36,7 @@ public class Game : MonoBehaviour
     private Vector3 initialCameraPos;
     private Vector3 targetCameraPos; // 目标相机位置
     private float blockHeight;
+    private List<GameObject> blocks = new List<GameObject>();
 
 
     void Start()
@@ -45,7 +47,7 @@ public class Game : MonoBehaviour
     public void StartGame()
     {
         isGameStarted = true;
-        startText.gameObject.SetActive(false);
+        // startText.gameObject.SetActive(false);
         startButton.gameObject.SetActive(false);
         blockRef.GetComponent<Rigidbody2D>().linearVelocity = new Vector2(-3, 0);
     }
@@ -72,10 +74,14 @@ public class Game : MonoBehaviour
         }
 
         // 清空现有建筑
-        foreach (Transform child in buildingParent)
+        foreach (GameObject block in blocks)
         {
-            Destroy(child.gameObject);
+            if (block != null)
+            {
+                Destroy(block);
+            }
         }
+        blocks.Clear();
 
         // 创建初始平台
         CreatePlatform();
@@ -112,14 +118,6 @@ public class Game : MonoBehaviour
             Debug.LogError("restartButton is not assigned!");
         }
 
-        if (startText != null)
-        {
-            startText.gameObject.SetActive(true);
-        }
-        else
-        {
-            Debug.LogError("startText is not assigned!");
-        }
 
         if (startButton != null)
         {
@@ -158,6 +156,7 @@ public class Game : MonoBehaviour
 
         // 设置为Kinematic类型，使平台固定不动，模拟地基
         rb.bodyType = RigidbodyType2D.Kinematic;
+        blocks.Add(platform);
         Debug.Log("Platform created at position: " + platform.transform.position);
     }
 
@@ -193,6 +192,7 @@ public class Game : MonoBehaviour
             Debug.LogWarning("blockRef is not assigned, spawning block at screen top");
         }
         currentBlock.transform.position = spawnPosition;
+        blocks.Add(currentBlock);
 
         Rigidbody2D rb = currentBlock.GetComponent<Rigidbody2D>();
         if (rb == null)
@@ -253,12 +253,6 @@ public class Game : MonoBehaviour
     void Update()
     {
         if (isGameOver || !isGameStarted) return;
-
-        // 控制方块左右移动
-        // MoveBlock();
-
-        // 应用建筑摇晃
-        // ApplyBuildingShake();
         
         // 平滑移动相机到目标位置
         if (Camera.main != null)
@@ -293,32 +287,35 @@ public class Game : MonoBehaviour
     {
         if (isGameOver) return;
         
-        if (currentBlock != null)
-        {
-            Rigidbody2D rb = currentBlock.GetComponent<Rigidbody2D>();
-            // 只有当方块已经启用了物理（处于下落状态）时，才检查是否掉落
-            if (rb.bodyType == RigidbodyType2D.Dynamic)
-            {
-                // 检查方块是否掉落
-                if (currentBlock.transform.position.y < -6)
-                {
-                    Debug.Log("Game Over: Block fell below threshold");
-                    GameOver();
-                }
-            }
-        }
+        // if (currentBlock != null)
+        // {
+        //     Rigidbody2D rb = currentBlock.GetComponent<Rigidbody2D>();
+        //     // 只有当方块已经启用了物理（处于下落状态）时，才检查是否掉落
+        //     if (rb.bodyType == RigidbodyType2D.Dynamic)
+        //     {
+        //         // 检查方块是否掉落
+        //         if (currentBlock.transform.position.y < -6)
+        //         {
+        //             Debug.Log("Game Over: Block fell below threshold");
+        //             GameOver();
+        //         }
+        //     }
+        // }
 
         // 检查建筑是否倾斜过度（跳过初始平台）
-        for (int i = 1; i < buildingParent.childCount; i++)
+        for (int i = 1; i < blocks.Count; i++)
         {
-            Transform child = buildingParent.GetChild(i);
-            // 检查建筑块的旋转角度，只有当旋转角度确实超过45度时才触发游戏结束
-            float zRotation = child.rotation.eulerAngles.z;
-            if (zRotation > 45 && zRotation < 315) // 处理0-360度的角度范围
+            GameObject block = blocks[i];
+            if (block != null)
             {
-                Debug.Log("Game Over: Building tilted too much");
-                GameOver();
-                break;
+                // 检查建筑块的旋转角度，只有当旋转角度确实超过45度时才触发游戏结束
+                float zRotation = block.transform.rotation.eulerAngles.z;
+                if (zRotation > 45 && zRotation < 315) // 处理0-360度的角度范围
+                {
+                    Debug.Log("Game Over: Building tilted too much");
+                    GameOver();
+                    break;
+                }
             }
         }
     }
@@ -401,27 +398,53 @@ public class Game : MonoBehaviour
             float delta = 7 - (top - buildingHeight);
             targetCameraPos = new Vector3(targetCameraPos.x, nowPos.y + delta, targetCameraPos.z);
         }
-        // 增加摇晃幅度
-        // shakeMagnitude = Mathf.Min(shakeMagnitude + shakeIncrement, maxShakeMagnitude);
-
-        // 检查游戏是否结束
-        StartCoroutine(CheckGameOver());
-
-        // 不再自动生成新方块，而是在Update中检查方块放置完成后再生成
     }
 
     // 方块碰撞事件处理
     public void OnBlockCollision()
     {
         hasCollided = true;
+        // 检查碰撞的方块是否碰到了最顶上的方块
+        CheckBlockCollisionValidity();
+    }
+
+    // 检查方块碰撞的有效性（是否碰到了最顶上的方块）
+    void CheckBlockCollisionValidity()
+    {
+        if (currentBlock == null || blocks.Count < 2)
+            return;
+
+        // 获取当前方块碰撞到的所有物体
+        Collider2D[] colliders = currentBlock.GetComponents<Collider2D>();
+        bool collidedWithTopBlock = false;
+
+        // 获取最顶上的方块（除了当前方块自己）
+        GameObject topBlock = blocks[blocks.Count - 2];
+
+        foreach (Collider2D collider in colliders)
+        {
+            // 检查当前方块是否与最顶上的方块碰撞
+            if (collider.IsTouching(topBlock.GetComponent<Collider2D>()))
+            {
+                collidedWithTopBlock = true;
+                break;
+            }
+        }
+
+        // 如果没有碰到最顶上的方块，游戏失败
+        if (!collidedWithTopBlock)
+        {
+            Debug.Log("Game Over: Block did not collide with the top block");
+            GameOver();
+        }
     }
 
     float CalculateAlignment()
     {
-        if (buildingParent.childCount < 2) return 1f;
+        if (blocks.Count < 2) return 1f;
 
         Transform current = currentBlock.transform;
-        Transform previous = buildingParent.GetChild(buildingParent.childCount - 2);
+        Transform previous = blocks[blocks.Count - 2].transform;
 
         float currentWidth = current.GetComponent<BoxCollider2D>().size.x * current.localScale.x;
         float previousWidth = previous.GetComponent<BoxCollider2D>().size.x * previous.localScale.x;
@@ -432,7 +455,7 @@ public class Game : MonoBehaviour
 
     void ApplyBuildingShake()
     {
-        if (buildingParent.childCount > 1)
+        if (blocks.Count > 1)
         {
             float shake = Mathf.Sin(Time.time * 5) * shakeMagnitude;
             buildingParent.transform.position = new Vector3(shake, buildingParent.transform.position.y, 0);
@@ -478,8 +501,7 @@ public class Game : MonoBehaviour
     public void RestartGame()
     {
         // 停止所有正在运行的协程，避免重新开始时的误判
-        StopAllCoroutines();
-        InitializeGame();
+        InitializeGame();        
         StartGame();
     }
 
