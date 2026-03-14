@@ -350,7 +350,7 @@ public class Game : MonoBehaviour
     void ReleaseBlock()
     {
         Debug.Log("building height: " + buildingHeight);
-        if (!isGameStarted || isGameOver) return;
+        if (!isGameStarted || isGameOver || currentBlock != null) return;
 
         // 生成新方块
         SpawnNewBlock();
